@@ -1,0 +1,37 @@
+server:
+  host: 0.0.0.0
+  port: 8090
+
+routing:
+  model_names:
+    - small_text
+    - frontier_reasoning
+    - vision_path
+  keyword_shortcuts:
+    frontier_reasoning:
+      - prove
+      - theorem
+      - derive
+      - rigorous
+      - step by step
+    vision_path:
+      - image
+      - screenshot
+      - photo
+      - diagram
+  shortcut_confidence: 0.97
+
+mlp:
+  input_dim: 1024
+  hidden_dims: [256, 128]
+  dropout: 0.0
+  compile: true
+  use_fp16_cuda: true
+  device: auto
+  backend: pytorch
+  checkpoint_path: artifacts/router_mlp.pth
+  onnx_path: artifacts/router_mlp.onnx
+  engine_path: artifacts/router_mlp.engine
+  trt_precision: fp16
+  trt_workspace_mb: 2048
+  allow_fallback: true

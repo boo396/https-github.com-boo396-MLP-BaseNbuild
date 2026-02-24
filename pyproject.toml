@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlp-basenbuild"
+version = "0.1.0"
+description = "GB10 ARM-first high-performance MLP router baseline"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.111",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.8",
+  "pyyaml>=6.0",
+  "numpy>=1.26",
+  "torch>=2.3",
+  "httpx>=0.27",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

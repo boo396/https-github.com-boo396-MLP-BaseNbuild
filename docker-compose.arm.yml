@@ -1,0 +1,11 @@
+services:
+  mlp-basenbuild:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mlp-basenbuild
+    network_mode: host
+    runtime: nvidia
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    command: ["python", "-m", "mlp_basenbuild.server", "--config", "configs/config.arm.yaml"]
