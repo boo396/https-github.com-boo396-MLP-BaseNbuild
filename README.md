@@ -19,6 +19,9 @@ GB10-first (ARM SoC) fast routing baseline focused on **speed over parameter cou
 
 ## Phase 2: Native TensorRT path (GB10 ARM)
 ### Reimage + Provision (recommended)
+0. One-command path:
+   - `./scripts/reimage_build.sh`
+   - strict: `./scripts/reimage_build.sh --strict`
 1. Post-reimage provisioning:
    - `sudo ./scripts/provision_gb10_native.sh`
    - strict mode (required TensorRT): `sudo ./scripts/provision_gb10_native.sh --strict`
