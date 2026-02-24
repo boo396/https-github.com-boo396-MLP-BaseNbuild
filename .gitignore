@@ -6,6 +6,9 @@ __pycache__/
 .pytest_cache/
 *.log
 *.pth
+build/
+dist/
+*.egg-info/
 *.onnx
 *.engine
 artifacts/

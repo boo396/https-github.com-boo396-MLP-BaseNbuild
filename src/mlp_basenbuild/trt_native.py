@@ -25,7 +25,11 @@ def detect_tensorrt_environment() -> Dict[str, Any]:
         from cuda import cudart as _cudart  # noqa: F401
         status["python_cuda"] = True
     except Exception:
-        pass
+        try:
+            from cuda.bindings import runtime as _cudart  # noqa: F401
+            status["python_cuda"] = True
+        except Exception:
+            pass
 
     status["ready"] = bool(status["trtexec"] or (status["python_tensorrt"] and status["python_cuda"]))
     return status
@@ -44,6 +48,7 @@ def export_router_to_onnx(model: torch.nn.Module, input_dim: int, onnx_path: str
         output_names=["output"],
         opset_version=opset,
         do_constant_folding=True,
+        external_data=False,
         dynamic_axes={"input": {0: "batch"}, "output": {0: "batch"}},
     )
     return str(target)
@@ -130,7 +135,10 @@ def _cuda_ok(result: Tuple[int, ...], op_name: str) -> Tuple[Any, ...]:
 class TensorRTRuntime:
     def __init__(self, engine_path: str):
         import tensorrt as trt
-        from cuda import cudart
+        try:
+            from cuda import cudart  # type: ignore
+        except Exception:
+            from cuda.bindings import runtime as cudart  # type: ignore
 
         self._cudart = cudart
         self._logger = trt.Logger(trt.Logger.WARNING)
@@ -146,9 +154,27 @@ class TensorRTRuntime:
         if self.context is None:
             raise RuntimeError("Failed to create TensorRT execution context")
 
-        names = [engine.get_binding_name(i) for i in range(engine.num_bindings)]
-        self.input_idx = engine.get_binding_index("input") if "input" in names else 0
-        self.output_idx = engine.get_binding_index("output") if "output" in names else 1
+        self._is_legacy_bindings = hasattr(engine, "num_bindings") and hasattr(engine, "get_binding_name")
+        if self._is_legacy_bindings:
+            names = [engine.get_binding_name(i) for i in range(engine.num_bindings)]
+            self.input_idx = engine.get_binding_index("input") if "input" in names else 0
+            self.output_idx = engine.get_binding_index("output") if "output" in names else 1
+            self.input_name = names[self.input_idx]
+            self.output_name = names[self.output_idx]
+        else:
+            input_names = []
+            output_names = []
+            for i in range(engine.num_io_tensors):
+                name = engine.get_tensor_name(i)
+                mode = engine.get_tensor_mode(name)
+                if mode == trt.TensorIOMode.INPUT:
+                    input_names.append(name)
+                elif mode == trt.TensorIOMode.OUTPUT:
+                    output_names.append(name)
+            if not input_names or not output_names:
+                raise RuntimeError("Failed to resolve TensorRT input/output tensors")
+            self.input_name = "input" if "input" in input_names else input_names[0]
+            self.output_name = "output" if "output" in output_names else output_names[0]
 
     def infer(self, batch_embeddings: np.ndarray) -> np.ndarray:
         if batch_embeddings.ndim != 2:
@@ -156,8 +182,14 @@ class TensorRTRuntime:
 
         host_in = np.ascontiguousarray(batch_embeddings.astype(np.float32))
         batch, dim = int(host_in.shape[0]), int(host_in.shape[1])
-        self.context.set_binding_shape(self.input_idx, (batch, dim))
-        out_shape = tuple(self.context.get_binding_shape(self.output_idx))
+
+        if self._is_legacy_bindings:
+            self.context.set_binding_shape(self.input_idx, (batch, dim))
+            out_shape = tuple(self.context.get_binding_shape(self.output_idx))
+        else:
+            self.context.set_input_shape(self.input_name, (batch, dim))
+            out_shape = tuple(self.context.get_tensor_shape(self.output_name))
+
         host_out = np.empty(out_shape, dtype=np.float32)
 
         d_in = _cuda_ok(self._cudart.cudaMalloc(host_in.nbytes), "cudaMalloc(input)")[0]
@@ -176,10 +208,15 @@ class TensorRTRuntime:
                 "cudaMemcpyAsync(H2D)",
             )
 
-            bindings = [0] * self.engine.num_bindings
-            bindings[self.input_idx] = int(d_in)
-            bindings[self.output_idx] = int(d_out)
-            self.context.execute_async_v2(bindings=bindings, stream_handle=stream)
+            if self._is_legacy_bindings:
+                bindings = [0] * self.engine.num_bindings
+                bindings[self.input_idx] = int(d_in)
+                bindings[self.output_idx] = int(d_out)
+                self.context.execute_async_v2(bindings=bindings, stream_handle=stream)
+            else:
+                self.context.set_tensor_address(self.input_name, int(d_in))
+                self.context.set_tensor_address(self.output_name, int(d_out))
+                self.context.execute_async_v3(stream)
 
             _cuda_ok(
                 self._cudart.cudaMemcpyAsync(

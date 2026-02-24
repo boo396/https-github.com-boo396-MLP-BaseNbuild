@@ -28,7 +28,7 @@ mlp:
   compile: true
   use_fp16_cuda: true
   device: auto
-  backend: pytorch
+  backend: tensorrt
   checkpoint_path: artifacts/router_mlp.pth
   onnx_path: artifacts/router_mlp.onnx
   engine_path: artifacts/router_mlp.engine
