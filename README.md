@@ -121,6 +121,9 @@ GB10-first (ARM SoC) fast routing baseline focused on **speed over parameter cou
    - `sudo ./scripts/provision_gb10_native.sh`
    - strict mode (required TensorRT): `sudo ./scripts/provision_gb10_native.sh --strict`
    - env variant: `STRICT_TRT=1 sudo ./scripts/provision_gb10_native.sh`
+    - TensorRT install mode (default `apt`):
+       - `TRT_INSTALL_METHOD=apt sudo ./scripts/provision_gb10_native.sh`
+       - `TRT_INSTALL_METHOD=pip sudo ./scripts/provision_gb10_native.sh`
    - optional custom PyTorch wheel source:
      - `TORCH_VERSION=2.9.1+cu128 TORCH_INDEX_URL=https://download.pytorch.org/whl/cu128 sudo ./scripts/provision_gb10_native.sh`
 2. Validate host/native stack:

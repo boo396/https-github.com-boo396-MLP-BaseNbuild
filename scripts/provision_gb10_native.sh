@@ -3,6 +3,9 @@ set -euo pipefail
 
 # GB10 ARM post-reimage provisioning for native TensorRT/ONNX path.
 # This script is intentionally host-native (minimal abstraction).
+# TensorRT install mode:
+#   TRT_INSTALL_METHOD=apt (default): install from configured apt repos
+#   TRT_INSTALL_METHOD=pip: install Python TensorRT wheel in venv (no apt TensorRT required)
 
 STRICT_MODE=0
 if [[ "${1:-}" == "--strict" ]]; then
@@ -43,26 +46,35 @@ apt-get install -y --no-install-recommends \
   htop \
   numactl
 
-# NVIDIA package install strategy:
-# 1) If TensorRT packages are already available from configured repos, install directly.
-# 2) If not available, fail with a clear message so operator can enable JetPack/L4T repos.
+TRT_INSTALL_METHOD="${TRT_INSTALL_METHOD:-apt}"
+if [[ "$TRT_INSTALL_METHOD" != "apt" && "$TRT_INSTALL_METHOD" != "pip" ]]; then
+  log "Unsupported TRT_INSTALL_METHOD='${TRT_INSTALL_METHOD}'. Use 'apt' or 'pip'."
+  exit 2
+fi
 
-log "Checking availability of TensorRT packages from apt repos"
-if apt-cache policy tensorrt | grep -q Candidate; then
-  log "Installing TensorRT runtime/tooling from apt"
-  apt-get install -y --no-install-recommends \
-    tensorrt \
-    libnvinfer-bin \
-    libnvinfer-dev \
-    libnvonnxparsers-dev \
-    libnvinfer-plugin-dev
-else
-  log "TensorRT apt package candidate not found."
-  log "Ensure NVIDIA JetPack/L4T apt repos are configured, then re-run this script."
-  if [[ "$STRICT_MODE" == "1" ]]; then
-    log "Strict mode enabled: failing because TensorRT packages are unavailable."
-    exit 2
+if [[ "$TRT_INSTALL_METHOD" == "apt" ]]; then
+  log "TensorRT install method: apt"
+  log "Checking availability of TensorRT packages from apt repos"
+  if apt-cache policy tensorrt | awk '/Candidate:/{print $2}' | grep -qv '(none)'; then
+    log "Installing TensorRT runtime/tooling from apt"
+    apt-get install -y --no-install-recommends \
+      tensorrt \
+      libnvinfer-bin \
+      libnvinfer-dev \
+      libnvonnxparsers-dev \
+      libnvinfer-plugin-dev \
+      python3-libnvinfer
+  else
+    log "TensorRT apt package candidate not found."
+    log "Ensure NVIDIA JetPack/L4T apt repos are configured, then re-run this script."
+    if [[ "$STRICT_MODE" == "1" ]]; then
+      log "Strict mode enabled: failing because TensorRT packages are unavailable."
+      exit 2
+    fi
   fi
+else
+  log "TensorRT install method: pip"
+  log "Skipping apt TensorRT package install"
 fi
 
 log "Ensuring Python virtualenv exists"
@@ -92,18 +104,24 @@ fi
 
 pip install -e .
 
-# Best-effort Python bindings for native stack
-# These may not be available on all ARM images; keep non-fatal.
+# Best-effort CUDA Python bindings for native stack
+# May not be available on all ARM images; keep non-fatal.
 pip install --no-cache-dir cuda-python || true
-pip install --no-cache-dir --extra-index-url https://pypi.nvidia.com tensorrt || true
+
+if [[ "$TRT_INSTALL_METHOD" == "pip" ]]; then
+  # TensorRT Python bindings from pip path only (avoid mixing apt + pip TensorRT installs).
+  pip install --no-cache-dir --extra-index-url https://pypi.nvidia.com tensorrt
+fi
 
 log "Provisioning complete. Running native stack check"
 ./scripts/check_native_stack.sh || true
 
 if [[ "$STRICT_MODE" == "1" ]]; then
-  if ! command -v trtexec >/dev/null 2>&1; then
-    log "Strict mode enabled: trtexec not found after provisioning."
-    exit 3
+  if [[ "$TRT_INSTALL_METHOD" == "apt" ]]; then
+    if ! command -v trtexec >/dev/null 2>&1; then
+      log "Strict mode enabled: trtexec not found after apt provisioning."
+      exit 3
+    fi
   fi
   if ! python3 - <<'PY'
 import importlib.util
