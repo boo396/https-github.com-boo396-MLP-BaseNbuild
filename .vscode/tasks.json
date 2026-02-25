@@ -1,0 +1,109 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Dev: Run Mock TRT-LLM",
+      "type": "shell",
+      "command": ". .venv/bin/activate && ./scripts/run_mock_trtllm.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev: Run Phi4 Reasoning Endpoints",
+      "type": "shell",
+      "command": ". .venv/bin/activate && ./scripts/run_phi4_reasoning_endpoints.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev: Run Phi4 Endpoints (Docker)",
+      "type": "shell",
+      "command": "./scripts/run_phi4_reasoning_endpoints_docker.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev: Stop Phi4 Endpoints (Docker)",
+      "type": "shell",
+      "command": "./scripts/stop_phi4_reasoning_endpoints_docker.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev: Run Expert Workers",
+      "type": "shell",
+      "command": ". .venv/bin/activate && ./scripts/run_workers_dev.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Check: Phi4 Reasoning Endpoints",
+      "type": "shell",
+      "command": "./scripts/check_reasoning_endpoints.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Smoke: FP8/BF16 Fallback E2E",
+      "type": "shell",
+      "command": "./scripts/smoke_fallback_e2e.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}

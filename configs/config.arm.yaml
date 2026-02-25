@@ -20,6 +20,8 @@ routing:
       - photo
       - diagram
   shortcut_confidence: 0.97
+  top_k: 2
+  enable_worker_dispatch: true
 
 mlp:
   input_dim: 1024
@@ -32,6 +34,42 @@ mlp:
   checkpoint_path: artifacts/router_mlp.pth
   onnx_path: artifacts/router_mlp.onnx
   engine_path: artifacts/router_mlp.engine
-  trt_precision: fp16
+  trt_precision: fp8
   trt_workspace_mb: 2048
   allow_fallback: true
+
+experts:
+  runtime: onnxruntime_int4
+  hidden_size: 4096
+  ffn_dim: 16384
+  divisible_by: 128
+  preferred_models:
+    - small_text
+    - vision_path
+  worker_endpoints:
+    small_text: http://127.0.0.1:8101/infer
+    vision_path: http://127.0.0.1:8102/infer
+  vision_model_id: microsoft/Phi-4-multimodal-instruct-onnx
+  vision_model_subdir: gpu/gpu-int4-rtn-block-32
+  hf_cache_dir: ~/.cache/huggingface
+  max_new_tokens: 256
+  temperature: 0.0
+  timeout_s: 20
+
+deep_thinking:
+  model_name: frontier_reasoning
+  runtime: trtllm
+  precision: fp8
+  fallback_precision: bf16
+  worker_endpoint: http://127.0.0.1:8103/infer
+  trtllm_model_name: microsoft/Phi-4-reasoning-plus
+  trtllm_fp8_url: http://127.0.0.1:8301
+  trtllm_bf16_url: http://127.0.0.1:8302
+  trtllm_timeout_s: 60
+  max_new_tokens: 512
+  temperature: 0.0
+  timeout_s: 45
+  escalation_confidence: 0.55
+
+dispatch:
+  return_worker_response: true

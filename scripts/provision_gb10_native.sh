@@ -75,6 +75,21 @@ fi
 
 source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
+
+# GB10-safe PyTorch install path.
+# Override defaults if your host uses a different CUDA/PyTorch build.
+TORCH_VERSION="${TORCH_VERSION:-2.9.1+cu128}"
+TORCH_INDEX_URL="${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu128}"
+INSTALL_GB10_TORCH="${INSTALL_GB10_TORCH:-1}"
+
+if [[ "$INSTALL_GB10_TORCH" == "1" ]]; then
+  log "Installing PyTorch (${TORCH_VERSION}) from ${TORCH_INDEX_URL}"
+  if ! pip install --index-url "$TORCH_INDEX_URL" "torch==${TORCH_VERSION}"; then
+    log "GB10 torch install failed; falling back to default resolver (torch>=2.3)"
+    pip install "torch>=2.3"
+  fi
+fi
+
 pip install -e .
 
 # Best-effort Python bindings for native stack

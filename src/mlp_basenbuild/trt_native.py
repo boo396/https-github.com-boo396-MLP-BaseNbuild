@@ -9,6 +9,19 @@ import numpy as np
 import torch
 
 
+def _normalize_precision(precision: str) -> str:
+    normalized = precision.strip().lower()
+    if normalized in {"fp32", "float", "float32"}:
+        return "fp32"
+    if normalized in {"fp16", "half", "float16"}:
+        return "fp16"
+    if normalized in {"bf16", "bfloat16"}:
+        return "bf16"
+    if normalized in {"fp8", "float8"}:
+        return "fp8"
+    raise ValueError(f"Unsupported TensorRT precision: {precision}")
+
+
 def detect_tensorrt_environment() -> Dict[str, Any]:
     status: Dict[str, Any] = {
         "trtexec": shutil.which("trtexec"),
@@ -71,8 +84,22 @@ def _build_engine_python(onnx_path: str, engine_path: str, precision: str, works
     config = builder.create_builder_config()
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, int(workspace_mb) * 1024 * 1024)
 
-    if precision.lower() == "fp16" and builder.platform_has_fast_fp16:
+    precision = _normalize_precision(precision)
+    if precision == "fp16":
+        if not getattr(builder, "platform_has_fast_fp16", False):
+            raise RuntimeError("Requested FP16, but platform_has_fast_fp16 is false")
         config.set_flag(trt.BuilderFlag.FP16)
+    elif precision == "bf16":
+        if not hasattr(trt.BuilderFlag, "BF16"):
+            raise RuntimeError("Requested BF16, but TensorRT build does not expose BuilderFlag.BF16")
+        config.set_flag(trt.BuilderFlag.BF16)
+    elif precision == "fp8":
+        if not hasattr(trt.BuilderFlag, "FP8"):
+            raise RuntimeError("Requested FP8, but TensorRT build does not expose BuilderFlag.FP8")
+        has_fast_fp8 = getattr(builder, "platform_has_fast_fp8", True)
+        if not has_fast_fp8:
+            raise RuntimeError("Requested FP8, but platform_has_fast_fp8 is false")
+        config.set_flag(trt.BuilderFlag.FP8)
 
     input_tensor = network.get_input(0)
     input_name = input_tensor.name
@@ -101,6 +128,7 @@ def build_engine_from_onnx(
     workspace_mb: int = 2048,
     trtexec_bin: str = "trtexec",
 ) -> str:
+    precision = _normalize_precision(precision)
     trtexec_path = shutil.which(trtexec_bin)
     if trtexec_path:
         cmd = [
@@ -112,8 +140,12 @@ def build_engine_from_onnx(
             "--maxShapes=input:32x1024",
             f"--workspace={int(workspace_mb)}",
         ]
-        if precision.lower() == "fp16":
+        if precision == "fp16":
             cmd.append("--fp16")
+        elif precision == "bf16":
+            cmd.append("--bf16")
+        elif precision == "fp8":
+            cmd.append("--fp8")
         subprocess.run(cmd, check=True)
         return str(engine_path)
 
